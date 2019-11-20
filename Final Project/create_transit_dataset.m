@@ -32,7 +32,7 @@ function create_transit_dataset()
             curve = readtable(char("./light_curves/lc_"+TIC+".csv"));
         catch e
             valid = false;
-            disp("No Valid Light Curve at i="+i+", TIC="+TIC");
+            disp("No Valid Light Curve at i="+i+", TIC="+TIC);
             warning(e.message);
         end
         if valid
