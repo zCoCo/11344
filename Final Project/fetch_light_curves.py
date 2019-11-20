@@ -43,7 +43,7 @@ with open('./data/star_data.csv') as csvfile:
                     pg = lcf.to_periodogram(oversample_factor=2);
                     period = pg.period_at_max_power;
                     # Fold at period and remove noise:
-                    transit = lcf.fold(period=period).bin(binsize=5);
+                    transit = lcf.fold(period=period).bin(binsize=35);
 
                     # Save Folded Transit Event:
                     transit.to_csv('./transits/tr_'+tic+'.csv');
