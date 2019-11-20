@@ -40,7 +40,7 @@ with open('./data/star_data.csv') as csvfile:
 
                     # Fold Data to Find Transit Curve:
                     # Find highest power frequency (.: period)
-                    pg = lcf.to_periodogram(oversample_factor=1);
+                    pg = lcf.to_periodogram(oversample_factor=2);
                     period = pg.period_at_max_power;
                     # Fold at period and remove noise:
                     transit = lcf.fold(period=period).bin(binsize=5);

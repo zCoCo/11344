@@ -53,6 +53,11 @@ function create_transit_dataset()
     validIdx = validIdx(validIdx ~= 0); % trim zeroes off end.
     N_peaks = N_peaks(validIdx ~= 0);
     peakSep = peakSep(validIdx ~= 0);
+
+    %% Post-Process (Remaining) Data:
+    for 
+        in.data{validIdx,:};
+    in.data{i,in.TICID};
     
     % Columns of Output Table (name of fields following structs,
     % 'class' must be first and is not present in structs):
@@ -64,13 +69,6 @@ function create_transit_dataset()
     out.data = table;
     out.data{:,:} = in.data{validIdx,:}; % copy over valid entries
     out.data{:,end+1:end+2} = [N_peaks, peakSep];
-    
-    %% Post-Process (Remaining) Data:
-    for c = 3:width(out.data)
-        min_val = min(out.data{:,c});
-        max_val = max(out.data{:,c});
-        out.data{:,c} = (out.data{:,c}-min_val) ./ (max_val-min_val);
-    end
 
     % Export Dataset:
     out.data.Properties.VariableNames = columnDesc; % Label Table
