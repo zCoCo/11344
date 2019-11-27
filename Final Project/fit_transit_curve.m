@@ -1,0 +1,141 @@
+function fit_transit_curve()
+    % Settings:
+    TIC = 311183180; % TICID of Star to Lookup
+
+    % Load Star Data:
+    starData = readtable('./data/star_data.csv');
+    % Load Transit Period Table:
+    transitPeriods = readtable(char("./data/transit_periods.csv"));
+    
+    % Fetch Relevant Metadata:
+    valid = true; % Whether valid data exists for all relevant features of this object
+    period = transitPeriods(transitPeriods.TICID == TIC, :).Period{:};
+    if numel(period) > 0
+        PPPeriod = period{1};
+    else
+        valid = false; % Period not in table (periodogram couldn't be built)
+    end
+    
+    % Load Transit Curve:
+    if valid
+        try
+            transit = readtable(char("./transits/tr_"+TIC+".csv"));
+        catch e
+            valid = false;
+            disp("No Valid Folded Transit Curve at i="+i+" for TIC="+TIC);
+            warning(e.message);
+        end
+    end
+    
+    if valid
+        star = find(starData.TIC_ID == TIC);
+        if numel(star) > 0
+            Rstar = starData.StarRadius(star(1));
+            Lstar = starData.StarLuminosity(star(1));
+        else
+            valid = false; % Period not in table (periodogram couldn't be built)
+        end
+    end
+    
+    % Compute Relevant Properties:
+    if valid
+        binned_flux = movmean(transit.flux, 35);
+        binned_time = movmean(transit.time, 35);
+            
+        % Find most common collections of fluxes in folded transit curve:
+        [N,flux_bins] = hist(binned_flux);
+        [~,flux_clumps] = findpeaks(N,flux_bins);
+        % Include edge "peaks" (the max, since this is likely the
+        % baseline):
+        [~,max_idx] = max(N);
+        flux_clumps(end+1) = flux_bins(max_idx);
+
+        % Nominal (baseline) Flux:
+        tr_base = max(flux_clumps);
+        % Maximum Transit Depth:
+        tr_min = min(flux_clumps);
+
+        % Transit Depth:
+         depthRatio = (tr_base - tr_min) / tr_base;
+         tr_depth = 1e6 * depthRatio;
+         transitDepth = tr_depth;
+        
+         % Compute Timing:
+        if tr_depth == 0 % No significant transit observed
+            transitEdgeTime(i) = 0;
+            transitDuration(i) = 0;
+        else
+            % Find time of first and last point below 10% depth:
+            idx_10 = transit.flux < (tr_base + 0.1*tr_depth); % Index of all points below 10% transit depth
+            t_10drop = transit.time(idx_10(1)); % Time when first transit drops below 10%
+            t_10rise = transit.time(idx_10(end)); % Time when transit rises above 10% for last time
+            % Find time of first point beyond 90% depth:
+            idx_90 = transit.flux < (tr_base + 0.9*tr_depth); % Index of all points below 90% transit depth
+            t_90drop = transit.time(idx_90(1)); % Time when first transit drops below 90%
+            t_90rise = transit.time(idx_90(end)); % Time when transit rises above 90% for last time
+            % Compute 10%->90% "Edge" Time:
+            t_fall = t_90drop - t_10drop; 
+            t_rise = t_10rise - t_90rise;
+            transitEdgeTime = mean([t_fall, t_rise]);
+            transitDuration = t_10rise - t_10drop;
+        end
+         
+        % Stellar Mass (in SI units):
+        if (Lstar/0.23)^(1/2.3) < 0.43
+            Mstar = (Lstar/0.23)^(1/2.3);
+        elseif 0.43 <= Lstar^0.25 && Lstar^0.25 < 2
+            Mstar = Lstar^0.25;
+        elseif Lstar / 32000 > 55
+            Mstar = Lstar / 32000;
+        else
+            Mstar = (Lstar/1.4)^(1/3.5);
+        end
+    end
+    
+    
+    Q = [depthRatio, 0, transitDuration*PPPeriod, -0.05*PPPeriod];
+    tr = @(t) transit_curve(t, Rstar, Q);
+    figure();
+    fplot(tr, [-0.5*PPPeriod, 0.5*PPPeriod]);
+
+end
+
+function Fe = transit_curve(t, Rstar, Q)
+    % Constants:
+    persistent Rsol Msol G;
+    Rsol = 695510e3; % [m] Radius of the Sun
+%     Msol = 1.9891e30; % [kg] Mass of the Sun
+%     G = 6.674e-11; % [SI units] Newton's Gravitonation Constant
+%     
+%     depthRatio = Q(1);
+%     period = Q(2)*86400; % days -> s
+%     Mstar = Q(3) * Msol; % -> SI base units
+%     Rstar = Q(4) * Rsol; % -> SI base units
+%     
+%     a = (G * Mstar * period^2 / 4 / (pi^2))^(1/3); % Semi-Major Axis (from Kepler's Third Law)
+    depthRatio = Q(1);
+    impactParam = Q(2);
+    transitTime = Q(3); % in days (or just same units as t
+    t0 = Q(4);
+    Rstar = Rstar * Rsol; % -> SI base units
+    
+    % Convert time parameterization into z-parameterization:
+    z = sqrt(4*((t-t0)/transitTime)^2 + impactParam^2);
+    
+    p = sqrt(depthRatio);
+
+    k0 = acos((z^2+p^2-1)/2/p/z);
+    k1 = acos((z^2-p^2+1)/2/z);
+    
+    if abs(1-p)< z && z <= (1+p)
+        lame = ( k0*p^2 + k1 - sqrt((4*z^2 - (1+z^2-p^2)^2)/4 ) )/ pi;
+    elseif z <= (1-p)
+        lame = p^2;
+    elseif z <= (p-1)
+        lame = 1;
+    else
+        lame = 0;
+    end
+    
+    Fe = 1 - lame;
+end
