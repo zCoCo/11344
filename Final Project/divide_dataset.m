@@ -5,7 +5,7 @@ function divide_dataset()
     p_train = 1/2; % fraction of complete dataset reserved for training
     p_test = 2/6; % fraction of complete dataset reserved for testing
     p_fin = 1-p_train-p_test; % fraction of complete dataset reserved for final testing
-
+    
     % Load dataset:
     in = readtable('./data/complete_data.csv');
     

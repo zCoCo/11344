@@ -1,7 +1,9 @@
-% Processes light_curves to add transit data to the star_data dataset.
+% Processes photometric data to add transit data to the star_data dataset.
 function create_transit_dataset()
     % Load star dataset
     in.data = readtable('./data/star_data.csv');
+    % Load Transit Period Table
+    transitPeriods = readtable(char("./data/transit_periods.csv"));
 
     % Input Data Column Indices:
     in.class = 1;
@@ -13,9 +15,12 @@ function create_transit_dataset()
 
     N_peaks = zeros(height(in.data),1); % Number of Flux Histogram Peaks for Each Light Curve
     peakSep = zeros(height(in.data),1); % Mean Peak Separatation in Flux Histogram for Each Light Curve
-    validIdx = zeros(height(in.data),1); % Valid Indices (have a light curve). Prealloc for speed.
+    PPPeriod = zeros(height(in.data),1); % Peak Power Period of Object
+    
+    validObjects = false(height(in.data),1); % Boolean List of All TIC Objects for which All Analysis could be Performed (all data valid).
     timer = tic;
-    for i = 1:515%height(in.data)
+    
+    for i = 1:height(in.data)
         TIC = in.data{i,in.TICID};
 
         if ~mod(i,10)
@@ -28,6 +33,8 @@ function create_transit_dataset()
         end
 
         valid = true;
+        %% Light Curve Analysis
+        % Grab Light Curve:
         try
             curve = readtable(char("./light_curves/lc_"+TIC+".csv"));
         catch e
@@ -35,8 +42,8 @@ function create_transit_dataset()
             disp("No Valid Light Curve at i="+i+", TIC="+TIC);
             warning(e.message);
         end
+        % Analyze Light Curve:
         if valid
-            validIdx(end+1) = i;
             % Find most common collections of fluxes:
             [N,X] = hist(curve.flux);
             [~,flux_clumps] = findpeaks(N,X);
@@ -45,15 +52,36 @@ function create_transit_dataset()
             if isnan(sep)
                 peakSep(i) = 0;
             else
-                %% TODO: PRUNE OUTLIERS, precalc F0, (and DF?) before descent.
+                %% TODO: Precalc F0, (and DF?) before descent.
                 peakSep(i) = 1e6 * sep / max(flux_clumps);
             end
         end
+        
+        %% Periodogram Results (peak power period)
+        % Find Transit Period (if in table and TIC hasn't been invalidated yet):
+        if valid
+            period = transitPeriods(transitPeriods.TICID == TIC, :).Period{:};
+            if numel(period) > 0
+                PPPeriod(i) = period{1};
+            else
+                valid = false; % Period not in table (periodogram couldn't be built)
+            end
+        end
+        
+        %% Folded Transit Curve Analysis
+        if valid
+            
+        end
+        
+        % Mark Validity:
+        validObjects(i) = valid;
     end
-    validIdx = validIdx(validIdx ~= 0); % trim zeroes off end.
-    N_peaks = N_peaks(validIdx ~= 0);
-    peakSep = peakSep(validIdx ~= 0);
-    
+
+    % Trim data from invalid objects:
+    N_peaks = N_peaks(validObjects);
+    peakSep = peakSep(validObjects);
+
+    %% Create New Dataset:
     % Columns of Output Table (name of fields following structs,
     % 'class' must be first and is not present in structs):
     columns = {'class', 'TICID', 'mag', 'Teff', 'Rstar', 'Lstar', 'Npeaks', 'peakSep'};
@@ -62,17 +90,10 @@ function create_transit_dataset()
     %columnDesc = {'class', 'TIC_ID', 'TESSMagnitude', 'StarTemp', 'StarRadius', 'StarLuminosity', 'FitRSquared', 'DepthPPM', 'Period', 'Number', 'Duration', 'RiseTime'}; % human-readable headers for output table
 
     out.data = table;
-    out.data{:,:} = in.data{validIdx,:}; % copy over valid entries
+    out.data{:,:} = in.data{validObjects,:}; % copy over valid entries
     out.data{:,end+1:end+2} = [N_peaks, peakSep];
-    
-    %% Post-Process (Remaining) Data:
-    for c = 3:width(out.data)
-        min_val = min(out.data{:,c});
-        max_val = max(out.data{:,c});
-        out.data{:,c} = (out.data{:,c}-min_val) ./ (max_val-min_val);
-    end
 
     % Export Dataset:
     out.data.Properties.VariableNames = columnDesc; % Label Table
-    writetable(out.data, './data/complete_data.csv');
+    writetable(out.data, './data/data_with_transits.csv');
 end
