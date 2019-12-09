@@ -3,9 +3,9 @@
 function postprocess_data()
     %% Settings:
     % Columns to Prune Outliers From:
-    pruneColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "PPPeriod"];
+    pruneColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "PPPeriod", "TransitDuration", "TransitEdgeTime"];
     % Columns to Normalize (everything but class and TIC_ID):
-    normColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "PPPeriod"];
+    normColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "NFluxRegions", "PPPeriod","TransitDepth","TransitDuration","TransitEdgeTime", "PlanetRadius", "StarGap"];
     
     %% Setup:
     % Load transit dataset
@@ -13,7 +13,7 @@ function postprocess_data()
     
     %% Replace Numeric Class with Nominal Class (necessary for Weka):
     toi = data.class == 1;
-    data.class = string(num2str(in.class)); % unfortunately, this outer #string is necessary
+    data.class = string(num2str(data.class)); % unfortunately, this outer #string is necessary
     data.class(toi)= "toi";
     data.class(~toi) = "not";
     
@@ -22,18 +22,23 @@ function postprocess_data()
     % Remove Outliers (instances where any column contains an extreme outlier within its respective column vector):
     outlier = zeros(height(data),1);
     for c = pruneColumns
-        [~, columnOutlier] = rmoutliers(data.(c), 'median'); % Use MAD
-        outlier = outlier | columnOutlier;
+        col = data.(c);
+        test = find(col ~= 0); % Don't test cells where the value is 0 (default / N/a.)
+        ignore = find(col == 0); % Rows to ignore (have default value of 0).
+        [~, columnOutlier] = rmoutliers(col(test), 'median'); % Use MAD
+        
+        new_outlier(test(columnOutlier) = true;
+        outlier = outlier | columnOutlier ;
     end
     
     % Have Human Make Sure this Won't Prune Too Much of the Dataset OR
     % Have a Bias for Pruning out Objects of Either Class (especially TOI),
     % if it were, this would mean that it's likely treating objects with
-    % distig
+    % distinguishing features as outliers.
     disp("Identified " + sum(outlier) + " Outliers: ");
-    N_toi = sum(data{~outlier,1} == 1);
+    N_toi = sum(data{~outlier,1} == "toi");
     N_non = length(data{~outlier,1}) - N_toi;
-    disp("The remaining distribution is " + N_toi + " TOIs and " + N_non + " Non-TOIs or a Non-TOI:TOI ratio of: " + N_non/N_toi + ".");
+    disp("The remaining distribution is " + N_toi + " TOIs and " + N_non + " Non-TOIs after a TOI:Non-TOI removal ratio of: " + sum(data{outlier,1} == "toi")/sum(data{outlier,1} ~= "toi") + ".");
     
     removeOutliers = input("Remove Outliers (y/n)?", 's');
     if contains(removeOutliers, 'y') || contains(removeOutliers, 'Y')

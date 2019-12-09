@@ -73,8 +73,7 @@ function create_transit_dataset()
         if valid
             period = transitPeriods(transitPeriods.TICID == TIC, :).Period;
             if numel(period) > 0
-                period = string(period{1});
-                PPPeriod(i) = sscanf(period, '%f');
+                PPPeriod(i) = string(period{1});
             else
                 valid = false; % Period not in table (periodogram couldn't be built)
             end
@@ -132,11 +131,11 @@ function create_transit_dataset()
                 % Compute 50%->100% "Edge" Time:
                 t_fall = t_100drop - t_50drop; 
                 t_rise = t_50rise - t_100rise;
-                transitEdgeTime(i) = 2*mean([t_fall, t_rise]) * PPPeriod(i);
-                transitDuration(i) = (t_50rise - t_50drop) + transitEdgeTime(i) * PPPeriod(i);
+                transitEdgeTime(i) = 2*mean([t_fall, t_rise]);
+                transitDuration(i) = (t_50rise - t_50drop) + transitEdgeTime(i);
                 
             % Compute Planet Parameters:
-                planetRadius(i) = in.data.StarRadius(find(in.data.TIC_ID == TIC,1)) * sqrt(depthRatio) * Rsol/REarth;
+                planetRadius(i) = in.data.StarRadius(find(in.data.TIC_ID == TIC,1)) * sqrt(depthRatio) * REarth/Rsol;
             end
         end
         
@@ -162,7 +161,7 @@ function create_transit_dataset()
 
     out.data = table;
     out.data{:,:} = in.data{validObjects,:}; % copy over valid entries
-    out.data{:,end+1:end+6} = [N_peaks, PPPeriod, transitDepth, transitDuration, transitEdgeTime, planetRadius];
+    out.data{:,end+1:end+5} = [N_peaks, ];
 
     % Export Dataset:
     out.data.Properties.VariableNames = columnDesc; % Label Table

@@ -12,7 +12,13 @@ function initial_observations()
     cols.Rstar = 5;
     cols.Lstar = 6;
     cols.Npeaks = 7;
-    cols.peakSep = 8;
+    cols.period = 8;
+    cols.transitDepth = 9;
+    cols.transitDuration = 10;
+    cols.transitEdgeTime = 11;
+    cols.planetRadius = 12;
+    cols.starGap = 13;
+    cols.starMass = 14;
     
     %% Compare All Numerical Columns:
     columns = string(fields(cols));
@@ -22,14 +28,17 @@ function initial_observations()
         N_bins = ceil(1 + log2(min([N_toi, N_nontoi]))); % Sturges rule
         
         figure();
-        [nontoi_counts, nontoi_values] = hist(raw_data{~toi, cols.(column)}, N_bins);
-        [toi_counts, toi_values] = hist(raw_data{toi, cols.(column)}, N_bins);
-        bar(nontoi_values, 100*nontoi_counts/N_nontoi, 'b');
+        histogram(raw_data{~toi, cols.(column)}, N_bins);
         hold on
-        bar(toi_values, 100*toi_counts/N_toi, 'g');
+        histogram(raw_data{toi, cols.(column)}, N_bins);
+%         [nontoi_counts, nontoi_values] = hist(raw_data{~toi, cols.(column)}, N_bins);
+%         [toi_counts, toi_values] = hist(raw_data{toi, cols.(column)}, N_bins);
+%         bar(nontoi_values, 100*nontoi_counts/N_nontoi, 'b');
+%         hold on
+%         bar(toi_values, 100*toi_counts/N_toi, 'g');
         xlabel("Feature Value: " + column, 'Interpreter','latex');
         legend({'Non-TOI Objects', 'TOI Objects'}, 'Interpreter','latex');
-        ylabel('Percentage of Objects in Class', 'Interpreter','latex');
+        ylabel('Number of Objects from Class', 'Interpreter','latex');
         title({"Distributions of " + column + " for TOI and Non-TOI Objects"}, 'Interpreter','latex');
         
         % Display Aggregate Results for Column:

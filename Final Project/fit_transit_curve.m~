@@ -1,6 +1,6 @@
 function fit_transit_curve()
     % Settings:
-    TIC = 149603524; % TICID of Star to Lookup
+    TIC = 38846515; % TICID of Star to Lookup
 
     % Load Star Data:
     starData = readtable('./data/star_data.csv');
@@ -41,20 +41,16 @@ function fit_transit_curve()
     
     % Compute Relevant Properties:
     if valid
-        binned_flux = smooth(transit.flux, floor(numel(transit.flux)/25), 'moving');
-        binned_time = transit.time;
+        binned_flux = movmean(transit.flux, 35);
+        binned_time = movmean(transit.time, 35);
             
         % Find most common collections of fluxes in folded transit curve:
         [N,flux_bins] = hist(binned_flux);
         [~,flux_clumps] = findpeaks(N,flux_bins);
-        % Include edge "peaks" if applicable (particularly the max, since this is likely the
+        % Include edge "peaks" (the max, since this is likely the
         % baseline):
-        if N(end) > N(end-1)
-            flux_clumps(end+1) = flux_bins(end);
-        end
-        if N(1) > N(2)
-            flux_clumps(end+1) = flux_bins(1);
-        end
+        [~,max_idx] = max(N);
+        flux_clumps(end+1) = flux_bins(max_idx);
 
         % Nominal (baseline) Flux:
         tr_base = max(flux_clumps);
@@ -71,21 +67,19 @@ function fit_transit_curve()
             transitEdgeTime = 0;
             transitDuration = 0;
         else
-            % Find time of first and last point below 50% depth:
-            idx_50 = find(binned_flux < (tr_base + 0.5*(tr_min-tr_base))); % Index of all points below 50% transit depth
-            t_50drop = transit.time(idx_50(1)); % Time when first transit drops below 50%
-            t_50rise = transit.time(idx_50(end)); % Time when transit rises above 50% for last time
-            % Find time of first point beyond 100% depth:
-            idx_100 = find(binned_flux < (tr_base + 1.0*(tr_min-tr_base))); % Index of all points below 100% transit depth
-            t_100drop = transit.time(idx_100(1)); % Time when first transit drops below 100%
-            t_100rise = transit.time(idx_100(end)); % Time when transit rises above 100% for last time
-            % Compute 50%->100% "Edge" Time:
-            t_fall = t_100drop - t_50drop; 
-            t_rise = t_50rise - t_100rise;
-            transitEdgeTime = 2*mean([t_fall, t_rise]);
-            transitDuration = (t_50rise - t_50drop) + transitEdgeTime;
-            [~, min_idx] = min(binned_flux);
-            t0 = binned_time(min_idx);
+            % Find time of first and last point below 10% depth:
+            idx_10 = find(binned_flux < (tr_base + 0.1*(tr_min-tr_base))); % Index of all points below 10% transit depth
+            t_10drop = transit.time(idx_10(1)); % Time when first transit drops below 10%
+            t_10rise = transit.time(idx_10(end)); % Time when transit rises above 10% for last time
+            % Find time of first point beyond 90% depth:
+            idx_90 = find(binned_flux < (tr_base + 0.9*(tr_min-tr_base))); % Index of all points below 90% transit depth
+            t_90drop = transit.time(idx_90(1)); % Time when first transit drops below 90%
+            t_90rise = transit.time(idx_90(end)); % Time when transit rises above 90% for last time
+            % Compute 10%->90% "Edge" Time:
+            t_fall = t_90drop - t_10drop; 
+            t_rise = t_10rise - t_90rise;
+            transitEdgeTime = mean([t_fall, t_rise]);
+            transitDuration = t_10rise - t_10drop;
         end
          
         % Stellar Mass (in SI units):
@@ -103,6 +97,7 @@ function fit_transit_curve()
     period = PPPeriod;
     impactParam = 0;
     transitTime = transitDuration*period;
+    t0 = -0.05*PPPeriod;
     Q = [depthRatio, impactParam, transitTime, t0];
     tr = @(t) transit_curve(t, period, Q);
     z = @(t) (period/pi/transitTime) * sqrt( (sin(2*pi*(t-t0)/period))^2 + (pi*impactParam*transitTime/period * cos(2*pi*(t-t0)/period))^2 );
@@ -110,27 +105,7 @@ function fit_transit_curve()
     hold on
         scatter(binned_time, binned_flux);
         fplot(tr, [-0.5*PPPeriod, 0.5*PPPeriod]);
-        
-        t_beg = t_50drop - (t_100drop-t_50drop);
-        plot([t_beg,t_beg],ylim,'k');
-        plot([t_50drop,t_50drop],ylim,'k');
-        plot([t_100drop,t_100drop],ylim,'k');
-        plot([t_100rise,t_100rise],ylim,'k');
-        plot([t_50rise,t_50rise],ylim,'k');
-        t_fin = t_50rise + (t_50rise-t_100rise);
-        plot([t_fin,t_fin],ylim,'k');
-        
-        plot(xlim,[tr_base,tr_base],'k');
-        thresh1 = tr_base + 0.5*(tr_min-tr_base);
-        plot(xlim,[thresh1,thresh1],'k');
-        thresh2 = tr_base + 1.0*(tr_min-tr_base);
-        plot(xlim,[thresh2,thresh2],'k');
-        plot(xlim,[tr_min,tr_min],'k');
-        
-        xlabel('Phase [x$T_{\mathrm{period}}$]', 'Interpreter','latex');
-        ylabel('Normalized Flux', 'Interpreter','latex');
-        title(char("TIC " + TIC), 'Interpreter','latex');
-        
+        plot(
         yyaxis right
         fplot(z, [-0.5*PPPeriod, 0.5*PPPeriod]);
 end

@@ -3,9 +3,9 @@
 function postprocess_data()
     %% Settings:
     % Columns to Prune Outliers From:
-    pruneColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "PPPeriod"];
+    pruneColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "PPPeriod", "TransitDepth", "TransitDuration", "TransitEdgeTime"];
     % Columns to Normalize (everything but class and TIC_ID):
-    normColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "PPPeriod"];
+    normColumns = ["TESSMagnitude", "StarTemp", "StarRadius", "StarLuminosity", "NFluxRegions", "PPPeriod","TransitDepth","TransitDuration","TransitEdgeTime", "PlanetRadius", "StarGap"];
     
     %% Setup:
     % Load transit dataset
@@ -22,8 +22,13 @@ function postprocess_data()
     % Remove Outliers (instances where any column contains an extreme outlier within its respective column vector):
     outlier = zeros(height(data),1);
     for c = pruneColumns
-        [~, columnOutlier] = rmoutliers(data.(c), 'median'); % Use MAD
-        outlier = outlier | columnOutlier;
+        col = data.(c);
+        test = find(col ~= 0); % Don't test cells where the value is 0 (default value / N/a. value)
+        [~, columnOutlier] = rmoutliers(col(test), 'median'); % Use MAD
+        
+        new_outlier = false(size(outlier));
+        new_outlier(test(columnOutlier),1) = true;
+        outlier = outlier | new_outlier;
     end
     
     % Have Human Make Sure this Won't Prune Too Much of the Dataset OR
@@ -33,7 +38,7 @@ function postprocess_data()
     disp("Identified " + sum(outlier) + " Outliers: ");
     N_toi = sum(data{~outlier,1} == "toi");
     N_non = length(data{~outlier,1}) - N_toi;
-    disp("The remaining distribution is " + N_toi + " TOIs and " + N_non + " Non-TOIs or a Non-TOI:TOI ratio of: " + N_non/N_toi + ".");
+    disp("The remaining distribution is " + N_toi + " TOIs and " + N_non + " Non-TOIs after a TOI:Non-TOI removal ratio of: " + sum(data{outlier,1} == "toi")/sum(data{outlier,1} ~= "toi") + ".");
     
     removeOutliers = input("Remove Outliers (y/n)?", 's');
     if contains(removeOutliers, 'y') || contains(removeOutliers, 'Y')
