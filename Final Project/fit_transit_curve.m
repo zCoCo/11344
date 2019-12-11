@@ -91,17 +91,6 @@ function fit_transit_curve()
             [~, min_idx] = min(binned_flux);
             t0 = binned_time(min_idx);
         end
-         
-        % Stellar Mass (in SI units):
-        if (Lstar/0.23)^(1/2.3) < 0.43
-            Mstar = (Lstar/0.23)^(1/2.3);
-        elseif 0.43 <= Lstar^0.25 && Lstar^0.25 < 2
-            Mstar = Lstar^0.25;
-        elseif Lstar / 32000 > 55
-            Mstar = Lstar / 32000;
-        else
-            Mstar = (Lstar/1.4)^(1/3.5);
-        end
     end
     
     % Get initial transit curve parameters:
@@ -166,7 +155,7 @@ function fit_transit_curve()
     else
         try
             Q0_reduced = Q0([1 2 3 5 6]);
-            options = optimoptions('fmincon', 'Display','iter', 'Algorithm','active-set', 'MaxIterations', 30, 'TolFun', 1e-5);
+            options = optimoptions('fmincon', 'Display','iter', 'Algorithm','active-set', 'MaxIterations', 30, 'TolFun', 5e-5);
             Q = fmincon(...
                     @fit_error_reduced, ... % minimize least-squared error
                     Q0_reduced, ... % initial condition (from analyzing folded curve)
@@ -194,7 +183,6 @@ function fit_transit_curve()
     disp(goodness_of_fit);
     
     % Extract fitted params:
-    
     depthRatio = Q(1);
     impactParam = Q(2);
     transitTime = Q(3);
@@ -356,10 +344,6 @@ function Fe = Fe(p,z)
     end
     
     lame(region) = ( k0(region).*p(pregion).^2 + k1(region) - sqrt((4*z(region).^2 - (1+z(region).^2-p(pregion).^2).^2)./4 ) )./ pi;
-
-    if min(lame) < 0
-        disp("break");
-    end     
     
     Fe = 1 - lame;
 end

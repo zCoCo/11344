@@ -161,6 +161,9 @@ function create_transit_dataset()
             
             %disp("Fitting Transit Curve . . . ");
             % Get baseline goodness-of-fit:
+            if in.data.class(i)
+                disp("break");
+            end
             goodness_of_fit = AR2(Q0, binned_time,binned_flux, period);
             %disp(" > Pre-fit Adjusted R2: ");
             %disp(goodness_of_fit);
@@ -191,13 +194,21 @@ function create_transit_dataset()
                     goodness_of_fit = AR2(Q, binned_time,binned_flux, period);
                     disp(" > Post-fit Adjusted R2: ");
                     disp(goodness_of_fit);
-                    % Extract fitted params:
-                    depthRatio = Q(1);
-                    impactParam(i) = Q(2);
-                    transitTime = Q(3);
-                    t0 = Q(4);
-                    linearLimbDarkening(i) = Q(5);
-                    quadLimbDarkening(i) = Q(6);
+                    
+
+            % Extract fitted params:
+            depthRatio = Q(1);
+            impactParam(i) = Q(2);
+            transitTime = Q(3);
+            t0 = Q(4);
+            gam1 = Q(5);
+            gam2 = Q(6);
+            
+            transitDepth(i) = 1e6 * depthRatio;
+            transitDuration(i) = transitTime;
+            linearLimbDarkening(i) = gam1;
+            quadLimbDarkening(i) = gam2;
+            % Compute Planet Parameters:
                 catch e
                     % Fitting failed, go with defaults.
                     %warning(" > Fitting Failed!");
@@ -205,12 +216,8 @@ function create_transit_dataset()
                     Q = Q0;
                 end
             end
-            
-            transitDuration(i) = transitTime;
-            transitDepth(i) = 1e6 * depthRatio;
-            transitCurveFit(i) = goodness_of_fit;
-            % Compute Planet Parameters:
             planetRadius(i) = in.data.StarRadius(find(in.data.TIC_ID == TIC,1)) * sqrt(depthRatio) * Rsol/REarth;
+            transitCurveFit(i) = goodness_of_fit;
         end
         
         % Mark Validity:
